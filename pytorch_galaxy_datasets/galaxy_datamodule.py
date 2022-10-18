@@ -106,29 +106,24 @@ class GalaxyDataModule(pl.LightningDataModule):
 
 
     def transform_with_album(self):
-
         if self.greyscale:
             transforms_to_apply = [A.Lambda(name='ToGray', image=ToGray(
                 reduce_channels=True), always_apply=True)]
         else:
-            transforms_to_apply = []
-
-            transforms_to_apply += [
-                A.ToFloat(),
-                # anything outside of the original image is set to 0.
-                A.Rotate(limit=180, interpolation=1,
-                         always_apply=True, border_mode=0, value=0),
-                A.RandomResizedCrop(
-                    height=self.resize_size,  # after crop resize
-                    width=self.resize_size,
-                    scale=self.crop_scale_bounds,  # crop factor
-                    ratio=self.crop_ratio_bounds,  # crop aspect ratio
-                    interpolation=1,  # This is "INTER_LINEAR" == BILINEAR interpolation. See: https://docs.opencv.org/3.4/da/d54/group__imgproc__transform.html
-                    always_apply=True
-                ),  # new aspect ratio
-                A.VerticalFlip(p=0.5),
-                ToTensorV2()
-            ]
+            transforms_to_apply = [A.ToFloat()]
+        transforms_to_apply += [A.Rotate(limit=180, interpolation=1,
+                        always_apply=True, border_mode=0, value=0),
+            A.RandomResizedCrop(
+                height=self.resize_size,  # after crop resize
+                width=self.resize_size,
+                scale=self.crop_scale_bounds,  # crop factor
+                ratio=self.crop_ratio_bounds,  # crop aspect ratio
+                interpolation=1,  # This is "INTER_LINEAR" == BILINEAR interpolation. See: https://docs.opencv.org/3.4/da/d54/group__imgproc__transform.html
+                always_apply=True
+            ),  # new aspect ratio
+            A.VerticalFlip(p=0.5),
+            ToTensorV2()
+        ]
 
         albumentations_transform = A.Compose(transforms_to_apply)
 
@@ -258,13 +253,13 @@ class GrayscaleUnweighted(torch.nn.Module):
 
 # albumentations versuib of GrayscaleUnweighted
 class ToGray():
-
     def __init__(self, reduce_channels=False):
         if reduce_channels:
             self.mean = lambda arr: arr.mean(axis=2, keepdims=True)
         else:
             self.mean = lambda arr: arr.mean(
                 axis=2, keepdims=True).repeat(3, axis=2)
-
     def __call__(self, image, **kwargs):
-        return self.mean(image)
+        mean = self.mean(image)
+        mean = A.augmentations.functional.to_float(mean, max_value=mean.max())
+        return mean
